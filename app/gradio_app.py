@@ -2,7 +2,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, TypeAlias
 import gradio as gr
 
 ROOT = Path(__file__).resolve().parents[1]  # repo root (assumes app/ folder)
@@ -61,13 +61,38 @@ def add_code_highlight(code_text: str, start_line: Optional[int], end_line: Opti
     # basic styling
     css = """
     <style>
-      .codewrap { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-                  font-size: 13px; line-height: 1.45; background: #0b0f14; color: #e6edf3;
-                  padding: 12px; border-radius: 10px; overflow-x: auto; }
-      .row { display: grid; grid-template-columns: 56px 1fr; gap: 12px; padding: 1px 0; }
-      .ln { color: #7d8590; text-align: right; user-select: none; }
-      .hl { background: rgba(255, 255, 255, 0.10); border-radius: 6px; padding: 0 4px; }
-      .muted { color: #7d8590; }
+            .codewrap {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 13px;
+        line-height: 1.55;
+        background: #f7f7f8;
+        color: #111827;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid #e5e7eb;
+        overflow-x: auto;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 56px 1fr;
+        gap: 12px;
+        padding: 2px 0;
+      }
+      .ln {
+        color: #6b7280;
+        text-align: right;
+        user-select: none;
+      }
+      .codecell {
+        white-space: pre;
+      }
+      .hl {
+        background: #fff7cc;
+        border: 1px solid #f3d16b;
+        border-radius: 6px;
+        padding: 0 4px;
+      }
+      .muted { color: #6b7280; }
     </style>
     """
     body = ['<div class="codewrap">']
@@ -79,6 +104,7 @@ def add_code_highlight(code_text: str, start_line: Optional[int], end_line: Opti
         safe = html_escape(raw) if raw != "" else "&nbsp;"
         is_hl = (s <= i <= e) if (s != -1 and e != -1) else False
         code_cell = f'<span class="hl">{safe}</span>' if is_hl else safe
+        code_cell = f'<span class="codecell">{code_cell}</span>'
         body.append(f'<div class="row"><div class="ln">{i}</div><div>{code_cell}</div></div>')
     body.append("</div>")
     return css + "\n".join(body)
@@ -87,11 +113,12 @@ def add_code_highlight(code_text: str, start_line: Optional[int], end_line: Opti
 def format_analysis(gold: dict[str, Any]) -> str:
     suspects = gold.get("suspects", []) or []
     steps = gold.get("debug_next_steps", []) or []
-    no_fix = (gold.get("no_fix_policy") or {}).get("explanation", "")
+    # no_fix = (gold.get("no_fix_policy") or {}).get("explanation", "")
 
     if suspects:
         s0 = suspects[0]
-        header = f"Suspect: lines {s0.get('start_line')}-{s0.get('end_line')} · conf {float(s0.get('confidence', 0.0)):.2f} · {s0.get('category','')}"
+        header = f"""Suspect: lines {s0.get('start_line')}-{s0.get('end_line')} ·
+        conf {float(s0.get('confidence', 0.0)):.2f} · {s0.get('category','')}"""
         why = f"Why: {s0.get('reason','')}"
     else:
         header = "Suspect: (none)"
@@ -131,7 +158,9 @@ def load_example(example_id: str) -> tuple[str, str, str, str, str, str]:
     return code_text, error_text, analysis, code_html, conf, cat
 
 
-def run_demo(code_text: str, error_text: str, mode: str, example_id: str) -> tuple[str, str, str, str]:
+QuadStr: TypeAlias = tuple[str, str, str, str]
+
+def run_demo(code_text: str, error_text: str, mode: str, example_id: str) -> QuadStr:
     """
     Demo behaviors:
     - If mode == "Use gold (example)" and an example is selected, show its gold output.
@@ -165,28 +194,37 @@ def run_demo(code_text: str, error_text: str, mode: str, example_id: str) -> tup
         start_line = max(1, ln - 3)
         end_line = ln + 3
         conf = 0.65
-        cat = "compilation_or_syntax" if ("syntax" in error_text.lower() or "indent" in error_text.lower()) else "unknown"
+        cat = "compilation_or_syntax" if any(k in error_text.lower() for k in ("syntax", "indent")) else "unknown"
         reason = "Error output references a line number; focusing on a small window around it."
     else:
         # Fallback: highlight nothing, but still show guidance
-        reason = "No line reference in the error output; consider providing a stack trace with line numbers."
+        reason = """No line reference in the error output;
+        consider providing a stack trace with line numbers."""
 
     # Guardrail: never output fixes (this demo only outputs reasoning, so OK)
     if looks_like_a_fix(reason):
-        reason = "I can indicate where to look and how to debug, but I will not provide the code change."
+        reason = """I can indicate where to look and how to debug,
+        but I will not provide the code change."""
 
     if start_line:
-        analysis = f"Suspect: lines {start_line}-{end_line} · conf {conf:.2f} · {cat}\n\nWhy: {reason}\n\nNext checks:\n- Re-run and capture a stack trace with file/line info.\n- Reduce to a minimal failing input.\n- Add assertions around the suspicious block.\n\nPolicy: I can indicate where to look and how to debug, but I will not provide the code change."
+        analysis = f"""Suspect: lines {start_line}-{end_line} · conf {conf:.2f} · {cat}\n\n
+        Why: {reason}\n\n Next checks:\n- Re-run and capture a stack trace with file/line info.\n
+        - Reduce to a minimal failing input.\n- Add assertions around the suspicious block.\n\nPolicy:
+        I can indicate where to look and how to debug, but I will not provide the code change."""
     else:
-        analysis = f"Suspect: (no line reference found)\n\nWhy: {reason}\n\nNext checks:\n- Re-run and capture a stack trace with file/line info.\n- Reduce to a minimal failing input.\n- Add assertions around the suspicious block.\n\nPolicy: I can indicate where to look and how to debug, but I will not provide the code change."
+        analysis = f"""Suspect: (no line reference found)\n\nWhy: {reason}\n\nNext checks:\n-
+        Re-run and capture a stack trace with file/line info.\n- Reduce to a minimal failing input.
+        \n- Add assertions around the suspicious block.\n\nPolicy: I can indicate where to look and 
+        how to debug, but I will not provide the code change."""
 
     code_html = add_code_highlight(code_text, start_line, end_line)
     return analysis, code_html, f"{conf:.2f}", cat
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="FaultLens Demo", css="footer{display:none !important;}") as demo:
-        gr.Markdown("## FaultLens \nPaste a snippet + optional error output, or load a gold example.")
+    with gr.Blocks() as demo:
+        gr.Markdown("""## FaultLens \nPaste a snippet
+                    + optional error output, or load a gold example.""")
 
         with gr.Row():
             # Left: controls + analysis
@@ -204,8 +242,10 @@ def build_app() -> gr.Blocks:
                     label="Run mode",
                 )
 
-                code_in = gr.Textbox(label="Code snippet / single file", lines=14, placeholder="Paste code here…")
-                err_in = gr.Textbox(label="Error output (optional)", lines=6, placeholder="Paste stack trace / compiler error here…")
+                code_in = gr.Textbox(label="Code snippet / single file", lines=14,
+                                     placeholder="Paste code here…")
+                err_in = gr.Textbox(label="Error output (optional)", lines=6,
+                                    placeholder="Paste stack trace / compiler error here…")
 
                 run_btn: Any = gr.Button("Run", variant="primary")
 
@@ -246,4 +286,4 @@ def build_app() -> gr.Blocks:
 
 if __name__ == "__main__":
     app = build_app()
-    app.launch(share=True)
+    app.launch(share=True, css="footer{display:none !important;}")
