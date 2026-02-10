@@ -117,8 +117,10 @@ def format_analysis(gold: dict[str, Any]) -> str:
 
     if suspects:
         s0 = suspects[0]
-        header = f"""Suspect: lines {s0.get('start_line')}-{s0.get('end_line')} ·
-        conf {float(s0.get('confidence', 0.0)):.2f} · {s0.get('category','')}"""
+        header = (
+            f"Suspect: lines {s0.get('start_line')}-{s0.get('end_line')} · "
+            f"conf {float(s0.get('confidence', 0.0)):.2f} · {s0.get('category','')}"
+        )
         why = f"Why: {s0.get('reason','')}"
     else:
         header = "Suspect: (none)"
@@ -198,24 +200,32 @@ def run_demo(code_text: str, error_text: str, mode: str, example_id: str) -> Qua
         reason = "Error output references a line number; focusing on a small window around it."
     else:
         # Fallback: highlight nothing, but still show guidance
-        reason = """No line reference in the error output;
-        consider providing a stack trace with line numbers."""
+        reason = "No line reference in the error output; consider providing a stack trace with line numbers."
 
     # Guardrail: never output fixes (this demo only outputs reasoning, so OK)
     if looks_like_a_fix(reason):
-        reason = """I can indicate where to look and how to debug,
-        but I will not provide the code change."""
+        reason = "I can indicate where to look and how to debug, but I will not provide the code change."
 
     if start_line:
-        analysis = f"""Suspect: lines {start_line}-{end_line} · conf {conf:.2f} · {cat}\n\n
-        Why: {reason}\n\n Next checks:\n- Re-run and capture a stack trace with file/line info.\n
-        - Reduce to a minimal failing input.\n- Add assertions around the suspicious block.\n\nPolicy:
-        I can indicate where to look and how to debug, but I will not provide the code change."""
+        analysis = (
+            f"Suspect: lines {start_line}-{end_line} · conf {conf:.2f} · {cat}\n\n"
+            f"Why: {reason}\n\n"
+            "Next checks:\n"
+            "- Re-run and capture a stack trace with file/line info.\n"
+            "- Reduce to a minimal failing input.\n"
+            "- Add assertions around the suspicious block.\n\n"
+            "Policy: I can indicate where to look and how to debug, but I will not provide the code change."
+        )
     else:
-        analysis = f"""Suspect: (no line reference found)\n\nWhy: {reason}\n\nNext checks:\n-
-        Re-run and capture a stack trace with file/line info.\n- Reduce to a minimal failing input.
-        \n- Add assertions around the suspicious block.\n\nPolicy: I can indicate where to look and 
-        how to debug, but I will not provide the code change."""
+        analysis = (
+            "Suspect: (no line reference found)\n\n"
+            f"Why: {reason}\n\n"
+            "Next checks:\n"
+            "- Re-run and capture a stack trace with file/line info.\n"
+            "- Reduce to a minimal failing input.\n"
+            "- Add assertions around the suspicious block.\n\n"
+            "Policy: I can indicate where to look and how to debug, but I will not provide the code change."
+        )
 
     code_html = add_code_highlight(code_text, start_line, end_line)
     return analysis, code_html, f"{conf:.2f}", cat
