@@ -218,14 +218,14 @@ def run_demo(code_text: str, error_text: str, mode: str, example_id: str) -> Qua
         )
     else:
         analysis = (
-            "Suspect: (no line reference found)\n\n"
-            f"Why: {reason}\n\n"
-            "Next checks:\n"
-            "- Re-run and capture a stack trace with file/line info.\n"
-            "- Reduce to a minimal failing input.\n"
-            "- Add assertions around the suspicious block.\n\n"
-            "Policy: I can indicate where to look and how to debug, but I will not provide the code change."
-        )
+        "Suspect: (no line reference found)\n\n"
+        f"Why: {reason}\n\n"
+        "Next checks:\n"
+        "- Re-run and capture a stack trace with file/line info.\n"
+        "- Reduce to a minimal failing input.\n"
+        "- Add assertions around the suspicious block.\n\n"
+        "Policy: I can indicate where to look and how to debug, but I will not provide the code change."
+    )
 
     code_html = add_code_highlight(code_text, start_line, end_line)
     return analysis, code_html, f"{conf:.2f}", cat
