@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -45,6 +43,7 @@ def run(cmd: List[str], cwd: Optional[str] = None, check: bool = True) -> str:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        check=False,
     )
     if check and p.returncode != 0:
         raise RuntimeError(f"Command failed ({p.returncode}): {' '.join(cmd)}\n{p.stdout}")
@@ -133,6 +132,7 @@ def git_show_file(repo_dir: Path, commit: str, file_path: str) -> Optional[str]:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        check=False,
     )
     if p.returncode != 0:
         return None
@@ -297,7 +297,7 @@ def get_next_global_index(out_jsonl: Path) -> int:
         m = re.search(r"__g(\d+)$", ex_id)
         if m:
             return int(m.group(1)) + 1
-    except Exception:
+    except (TypeError, json.JSONDecodeError, ValueError):
         pass
     return 1
 
