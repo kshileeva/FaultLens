@@ -176,6 +176,7 @@ def clamp_region(start: int, end: int, nlines: int) -> Tuple[int, int]:
     return start, end
 
 
+
 def merge_regions(regions: List[Tuple[int, int]], merge_gap: int = 15) -> List[Tuple[int, int]]:
     """Merge overlapping or near-adjacent regions. Two regions merge if next.start <= cur.end + merge_gap."""
     if not regions:
@@ -191,6 +192,23 @@ def merge_regions(regions: List[Tuple[int, int]], merge_gap: int = 15) -> List[T
             cur_s, cur_e = s, e
     merged.append((cur_s, cur_e))
     return merged
+
+
+# ---- Split regions helper ----
+def split_regions(regions: List[Tuple[int, int]], max_len: int) -> List[Tuple[int, int]]:
+    """Split each region into sub-regions of length <= max_len (inclusive)."""
+    if max_len <= 0:
+        return regions
+    out: List[Tuple[int, int]] = []
+    for s, e in regions:
+        if e < s:
+            s, e = e, s
+        cur = s
+        while cur <= e:
+            sub_end = min(e, cur + max_len - 1)
+            out.append((cur, sub_end))
+            cur = sub_end + 1
+    return out
 
 
 # -----------------------------
@@ -402,8 +420,13 @@ def main() -> None:
                             continue
 
                         merged = merge_regions(raw_regions, merge_gap=args.merge_gap)
+                        merged = split_regions(merged, max_len=args.max_region)
 
                         for gold_start, gold_end in merged:
+                            gold_start = max(1, min(gold_start, len(lines)))
+                            gold_end = max(1, min(gold_end, len(lines)))
+                            if gold_end < gold_start:
+                                gold_start, gold_end = gold_end, gold_start
                             region_idx += 1
 
                             snippet, win_start = extract_window(
