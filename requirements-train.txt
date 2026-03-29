@@ -1,0 +1,4 @@
+# Training stack for scripts/train_faultlens_unsloth.py
+datasets>=2.14.0
+trl>=0.7.0
+unsloth

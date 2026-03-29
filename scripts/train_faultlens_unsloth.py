@@ -1,32 +1,11 @@
-from __future__ import annotations
-
-"""
-Train FaultLens bug-localization model with Unsloth + Qwen3.
-
-This script expects:
-- data/train.jsonl  (created via scripts/split_train_test.py)
-- Each line: {"id": "...", "messages": [...]} as in train_sft.cleaned.jsonl
-
-Example usage (L40S 48GB, Qwen3-8B-Base, QLoRA):
-
-  python scripts/train_faultlens_unsloth.py \
-    --model_name unsloth/Qwen3-8B-Base \
-    --train_file data/train.jsonl \
-    --output_dir outputs/faultlens_qwen3_8b \
-    --max_seq_length 4096 \
-    --per_device_train_batch_size 4 \
-    --gradient_accumulation_steps 8 \
-    --num_train_epochs 3
-"""
-
 import argparse
 import json
 from pathlib import Path
 from typing import Any, Dict, List
 
 from datasets import Dataset
-from trl import SFTConfig, SFTTrainer
-
+from trl.trainer.sft_config import SFTConfig
+from trl.trainer.sft_trainer import SFTTrainer
 from unsloth import FastLanguageModel
 
 
@@ -104,30 +83,25 @@ def main() -> None:
     )
 
     system_prompt = (
-        "You are FaultLens, an assistant that localizes bugs in code but never provides code fixes. "
-        "You must output ONLY valid JSON matching the expected bug_localization schema."
+     "You are FaultLens, an assistant that localizes bugs in code but never provides code fixes."
+     "You must output ONLY valid JSON matching the expected bug_localization schema."
     )
 
-    def formatting_func(batch: Dict[str, Any]) -> Dict[str, List[str]]:
-        """Convert chat-style messages into plain text using the tokenizer's chat template."""
-        texts: List[str] = []
-        for msgs in batch["messages"]:
-            # Ensure system message is present; if missing, prepend it.
-            has_system = any(m.get("role") == "system" for m in msgs)
-            if not has_system:
-                msgs = [{"role": "system", "content": system_prompt}] + list(msgs)
-
-            text = tokenizer.apply_chat_template(
-                msgs,
-                tokenize=False,
-                add_generation_prompt=False,
-            )
-            texts.append(text)
-        return {"text": texts}
+    def formatting_func(example: Dict[str, Any]) -> str:
+        """Convert one chat-style row into plain text using the tokenizer's chat template."""
+        msgs = list(example["messages"])
+        has_system = any(m.get("role") == "system" for m in msgs)
+        if not has_system:
+            msgs = [{"role": "system", "content": system_prompt}] + msgs
+        return tokenizer.apply_chat_template(
+            msgs,
+            tokenize=False,
+            add_generation_prompt=False,
+        )
 
     sft_config = SFTConfig(
         output_dir=str(args.output_dir),
-        max_seq_length=args.max_seq_length,
+        max_length=args.max_seq_length,
         num_train_epochs=args.num_train_epochs,
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
@@ -143,7 +117,7 @@ def main() -> None:
     print("Starting SFT training...")
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=dataset,
         args=sft_config,
         formatting_func=formatting_func,
@@ -155,10 +129,8 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(str(args.output_dir))
     tokenizer.save_pretrained(str(args.output_dir))
-
-    print("Done.")
+    print("Done")
 
 
 if __name__ == "__main__":
     main()
-
