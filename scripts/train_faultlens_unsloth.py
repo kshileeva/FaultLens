@@ -31,8 +31,8 @@ def main() -> None:
     ap.add_argument(
         "--train_file",
         type=Path,
-        default=Path("data/train.jsonl"),
-        help="JSONL train file (same format as train_sft.cleaned.jsonl).",
+        default=Path("data/train_sft.cleaned.jsonl"),
+        help="JSONL train file (chat messages format; default: cleaned SFT export).",
     )
     ap.add_argument(
         "--output_dir",
