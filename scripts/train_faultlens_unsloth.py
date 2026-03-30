@@ -77,7 +77,7 @@ def main() -> None:
         model,
         r=16,
         lora_alpha=32,
-        lora_dropout=0.05,
+        lora_dropout=0.0,
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         use_gradient_checkpointing="unsloth",
     )
@@ -87,17 +87,20 @@ def main() -> None:
      "You must output ONLY valid JSON matching the expected bug_localization schema."
     )
 
-    def formatting_func(example: Dict[str, Any]) -> str:
+    def format_example(example: Dict[str, Any]) -> Dict[str, str]:
         """Convert one chat-style row into plain text using the tokenizer's chat template."""
         msgs = list(example["messages"])
         has_system = any(m.get("role") == "system" for m in msgs)
         if not has_system:
             msgs = [{"role": "system", "content": system_prompt}] + msgs
-        return tokenizer.apply_chat_template(
+        return {"text": tokenizer.apply_chat_template(
             msgs,
             tokenize=False,
             add_generation_prompt=False,
-        )
+        )}
+
+    print("Formatting dataset...")
+    dataset = dataset.map(format_example)
 
     sft_config = SFTConfig(
         output_dir=str(args.output_dir),
@@ -112,6 +115,7 @@ def main() -> None:
         bf16=True,
         seed=args.seed,
         packing=False,
+        dataset_text_field="text",
     )
 
     print("Starting SFT training...")
@@ -120,7 +124,6 @@ def main() -> None:
         processing_class=tokenizer,
         train_dataset=dataset,
         args=sft_config,
-        formatting_func=formatting_func,
     )
 
     trainer.train()
