@@ -71,6 +71,8 @@ def main() -> None:
         max_seq_length=args.max_seq_length,
         load_in_4bit=args.load_in_4bit,
     )
+    # Unsloth patches eos_token to "<EOS_TOKEN>" which TRL rejects; reset to Qwen3's actual EOS token.
+    tokenizer.eos_token = "<|im_end|>"
 
     print("Wrapping with LoRA (QLoRA).")
     model = FastLanguageModel.get_peft_model(
