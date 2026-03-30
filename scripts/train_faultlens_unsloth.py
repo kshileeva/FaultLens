@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from datasets import Dataset
-from trl.trainer.sft_config import SFTConfig
-from trl.trainer.sft_trainer import SFTTrainer
+from trl import SFTConfig, SFTTrainer
 from unsloth import FastLanguageModel
 
 
@@ -62,7 +61,6 @@ def main() -> None:
     rows = load_train_jsonl(args.train_file)
     print(f"Loaded {len(rows)} examples.")
 
-    # Hugging Face Dataset with original messages kept intact
     dataset = Dataset.from_list(rows)
 
     print(f"Loading base model: {args.model_name}")
@@ -71,8 +69,6 @@ def main() -> None:
         max_seq_length=args.max_seq_length,
         load_in_4bit=args.load_in_4bit,
     )
-    # Unsloth patches eos_token to "<EOS_TOKEN>" which TRL rejects; reset to Qwen3's actual EOS token.
-    tokenizer.eos_token = "<|im_end|>"
 
     print("Wrapping with LoRA (QLoRA).")
     model = FastLanguageModel.get_peft_model(
@@ -85,8 +81,8 @@ def main() -> None:
     )
 
     system_prompt = (
-     "You are FaultLens, an assistant that localizes bugs in code but never provides code fixes."
-     "You must output ONLY valid JSON matching the expected bug_localization schema."
+        "You are FaultLens, an assistant that localizes bugs in code but never provides code fixes."
+        "You must output ONLY valid JSON matching the expected bug_localization schema."
     )
 
     def format_example(example: Dict[str, Any]) -> Dict[str, str]:
@@ -105,7 +101,7 @@ def main() -> None:
 
     sft_config = SFTConfig(
         output_dir=str(args.output_dir),
-        max_length=args.max_seq_length,
+        max_seq_length=args.max_seq_length,
         num_train_epochs=args.num_train_epochs,
         per_device_train_batch_size=args.per_device_train_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
@@ -122,7 +118,7 @@ def main() -> None:
     print("Starting SFT training...")
     trainer = SFTTrainer(
         model=model,
-        processing_class=tokenizer,
+        tokenizer=tokenizer,
         train_dataset=dataset,
         args=sft_config,
     )
