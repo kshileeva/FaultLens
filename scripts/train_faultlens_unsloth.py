@@ -88,16 +88,15 @@ def main() -> None:
     )
 
     def format_example(example: Dict[str, Any]) -> Dict[str, str]:
-        """Convert one chat-style row into plain text using the tokenizer's chat template."""
+        """Convert one chat-style row into Qwen3 ChatML format."""
         msgs = list(example["messages"])
         has_system = any(m.get("role") == "system" for m in msgs)
         if not has_system:
             msgs = [{"role": "system", "content": system_prompt}] + msgs
-        return {"text": tokenizer.apply_chat_template(
-            msgs,
-            tokenize=False,
-            add_generation_prompt=False,
-        )}
+        text = ""
+        for msg in msgs:
+            text += f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>\n"
+        return {"text": text}
 
     print("Formatting dataset...")
     dataset = dataset.map(format_example)
